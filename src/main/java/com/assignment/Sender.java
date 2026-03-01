@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+
 import org.json.JSONObject;
 import org.msgpack.core.MessagePack;
 import org.msgpack.core.MessageBufferPacker;
@@ -35,6 +37,12 @@ public class Sender {
             receiverSocket.connect(new java.net.InetSocketAddress(receiver_address, receiver_port));
             System.out.println("Connected to receiver at " + receiver_address + ":" + receiver_port);
 
+            // Create input stream to receive responses from receiver
+            BufferedReader in = new BufferedReader(new InputStreamReader(receiverSocket.getInputStream()));
+
+            // Create output stream to send data to receiver
+            DataOutputStream out = new DataOutputStream(receiverSocket.getOutputStream());
+
             long startTime, endTime, elapsedTime, elapsedTimeAvg;
             long[] iteration_times = new long[number_of_iterations];
             
@@ -47,25 +55,36 @@ public class Sender {
                             
                             // Start timer
                             startTime = System.nanoTime();
+                            
+                            // Send type of packet and number of packages to receiver
+                            out.writeUTF(packet_type);
+                            out.writeInt(number_of_packages);
 
                             if (packet_type.equals("json")) {
                                 // Serialize data
                                 List<JSONObject> jsonPackages = createJsonPackages(package_size_kb, nesting_level);
 
                                 // Send data
-
+                                for (JSONObject obj : jsonPackages) {
+                                    byte[] data = obj.toString().getBytes(StandardCharsets.UTF_8);
+                                    out.writeInt(data.length);
+                                    out.write(data);
+                                }
 
                             } else if (packet_type.equals("msgpack")) {
                                 // Serialize data
                                 List<byte[]> msgpackPackages = createMsgPackPackages(package_size_kb, nesting_level);
 
                                 // Send data
-
-
+                                for (byte[] data : msgpackPackages) {
+                                    out.writeInt(data.length);
+                                    out.write(data);
+                                }
                             }
+
+                            out.flush();
                             
-                            // Receive response from receiver
-                            BufferedReader in = new BufferedReader(new InputStreamReader(receiverSocket.getInputStream()));
+                            // Receive response from receiver   
                             String response = in.readLine();
                             if (response == null || !response.equals("ACK")) {
                                 System.out.println("Failed to receive ACK from receiver");
@@ -84,6 +103,15 @@ public class Sender {
                             elapsedTimeAvg += time;
                         }
                         elapsedTimeAvg /= number_of_iterations;
+
+                        /*
+                        Overall we are measuring:
+                        JSON/MessagePack serialization cost
+                        TCP buffering
+                        OS scheduling
+                        Receiver processing time
+                        ACK round trip time
+                        */
 
                         // Store time measurement
                         if (packet_type.equals("json")) {
@@ -135,16 +163,58 @@ public class Sender {
     }
 
     private static List<JSONObject> createJsonPackages(int packageSizeKB, int nestingLevel) {
+        List<JSONObject> packages = new ArrayList<>();
 
+        // For simplicity, create a single package per call
+        JSONObject root = createNestedJson(nestingLevel, packageSizeKB * 1024);
+        packages.add(root);
 
-
-        return new ArrayList<>();
+        return packages;
     }
 
-    private static List<byte[]> createMsgPackPackages(int packageSizeKB, int nestingLevel) {
+    // Recursive helper to create nested JSON with 2^depth leaves
+    private static JSONObject createNestedJson(int depth, int totalBytes) {
+        JSONObject node = new JSONObject();
+        if (depth <= 1) {
+            // Leaf node: fill with dummy data to match totalBytes
+            StringBuilder sb = new StringBuilder(totalBytes);
+            for (int i = 0; i < totalBytes; i++) sb.append("x");
+            node.put("data", sb.toString());
+        } else {
+            int bytesPerChild = totalBytes / 2; // split equally among 2 children
+            node.put("0", createNestedJson(depth - 1, bytesPerChild));
+            node.put("1", createNestedJson(depth - 1, bytesPerChild));
+        }
+        return node;
+    }
 
 
+    // Create multiple MsgPack packages
+    private static List<byte[]> createMsgPackPackages(int packageSizeKB, int nestingLevel) throws IOException {
+        List<byte[]> packages = new ArrayList<>();
+        MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
+        packNestedMsgPack(packer, nestingLevel, packageSizeKB * 1024);
+        packer.close();
+        packages.add(packer.toByteArray());
+        return packages;
+    }
 
-        return new ArrayList<>();
+    // Recursive helper for MsgPack
+    private static void packNestedMsgPack(MessageBufferPacker packer, int depth, int totalBytes) throws IOException {
+        if (depth <= 1) {
+            // Leaf node: pack dummy data
+            StringBuilder sb = new StringBuilder(totalBytes);
+            for (int i = 0; i < totalBytes; i++) sb.append("x");
+            packer.packString(sb.toString());
+        } else {
+            // Internal node: 2 children
+            packer.packMapHeader(2);
+
+            packer.packString("0");
+            packNestedMsgPack(packer, depth - 1, totalBytes / 2);
+
+            packer.packString("1");
+            packNestedMsgPack(packer, depth - 1, totalBytes / 2);
+        }
     }
 }
