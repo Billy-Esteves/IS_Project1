@@ -1,6 +1,7 @@
 package com.assignment;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.io.*;
 import java.net.Socket;
@@ -11,6 +12,10 @@ import org.msgpack.core.MessagePack;
 import org.msgpack.core.MessageBufferPacker;
 import org.msgpack.core.MessageUnpacker;
 import java.util.Timer;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Sender {
 
@@ -130,6 +135,54 @@ public class Sender {
 
         // Close connection
         receiverSocket.close();
+
+
+        // Write time measurements to excel file
+        writeTimeMeasurementsToExcel(time_measurements);
+    }
+
+    private static void writeTimeMeasurementsToExcel(JSONObject timeMeasurements) {
+        try {
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("Time Measurements");
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("Packet Type");
+            headerRow.createCell(1).setCellValue("Package Size (KB)");
+            headerRow.createCell(2).setCellValue("Nesting Level");
+            headerRow.createCell(3).setCellValue("Average Time (ns)");
+
+            int rowNum = 1;
+            for (String packetType : Arrays.asList("json", "msgpack")) {
+                JSONObject packetTypeObj = timeMeasurements.getJSONObject(packetType);
+                for (String packageSize : packetTypeObj.keySet()) {
+                    JSONObject packageSizeObj = packetTypeObj.getJSONObject(packageSize);
+                    for (String nestingLevel : packageSizeObj.keySet()) {
+                        long avgTime = packageSizeObj.getLong(nestingLevel);
+                        Row row = sheet.createRow(rowNum++);
+                        row.createCell(0).setCellValue(packetType);
+                        row.createCell(1).setCellValue(Integer.parseInt(packageSize));
+                        row.createCell(2).setCellValue(Integer.parseInt(nestingLevel));
+                        row.createCell(3).setCellValue(avgTime);
+                    }
+                }
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < 4; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Write to file
+            FileOutputStream fileOut = new FileOutputStream("time_measurements.xlsx");
+            workbook.write(fileOut);
+            fileOut.close();
+            workbook.close();
+
+        } catch (IOException e) {
+            System.out.println("Failed to write time measurements to Excel file: " + e.getMessage());
+        }
     }
 
     private static JSONObject timeStorageJson() {
