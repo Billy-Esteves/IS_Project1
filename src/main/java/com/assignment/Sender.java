@@ -24,7 +24,7 @@ public class Sender {
     static int number_of_packages = 1000;
     static int number_of_iterations = 5;
 
-    static int receiver_port = 8080;
+    static int receiver_port = 8080; //TODO: change this, only a placeholder
     static String receiver_address = "localhost";
 
     static String[] packet_types = new String[] {"json", "msgpack"};
