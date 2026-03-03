@@ -21,7 +21,7 @@ public class Sender {
 
     static int[] package_sizes_kb = new int[] {10, 100, 1000};
     static int[] nesting_levels = new int[] {1, 5, 10};
-    static int number_of_packages = 1;
+    static int number_of_packages = 10;
     static int number_of_iterations = 5;
 
     static int receiver_port = 8080; //TODO: change this, only a placeholder
@@ -67,7 +67,7 @@ public class Sender {
 
                             if (packet_type.equals("json")) {
                                 // Serialize data
-                                List<JSONObject> jsonPackages = createJsonPackages(package_size_kb, nesting_level);
+                                List<JSONObject> jsonPackages = createJsonPackages(package_size_kb, nesting_level, number_of_packages);
 
                                 // Send data
                                 for (JSONObject obj : jsonPackages) {
@@ -78,7 +78,7 @@ public class Sender {
 
                             } else if (packet_type.equals("msgpack")) {
                                 // Serialize data
-                                List<byte[]> msgpackPackages = createMsgPackPackages(package_size_kb, nesting_level);
+                                List<byte[]> msgpackPackages = createMsgPackPackages(package_size_kb, nesting_level, number_of_packages);
 
                                 // Send data
                                 for (byte[] data : msgpackPackages) {
@@ -215,12 +215,14 @@ public class Sender {
         return time_measurement_storage;
     }
 
-    private static List<JSONObject> createJsonPackages(int packageSizeKB, int nestingLevel) {
+    private static List<JSONObject> createJsonPackages(int packageSizeKB, int nestingLevel, int numPackages) {
         List<JSONObject> packages = new ArrayList<>();
 
-        // For simplicity, create a single package per call
-        JSONObject root = createNestedJson(nestingLevel, packageSizeKB * 1024);
-        packages.add(root);
+        JSONObject root;
+        for (int i = 0; i < numPackages; i++) {
+            root = createNestedJson(nestingLevel, packageSizeKB * 1024);
+            packages.add(root);
+        }
 
         return packages;
     }
@@ -243,12 +245,18 @@ public class Sender {
 
 
     // Create multiple MsgPack packages
-    private static List<byte[]> createMsgPackPackages(int packageSizeKB, int nestingLevel) throws IOException {
+    private static List<byte[]> createMsgPackPackages(int packageSizeKB, int nestingLevel, int numPackages) throws IOException {
         List<byte[]> packages = new ArrayList<>();
+
         MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
-        packNestedMsgPack(packer, nestingLevel, packageSizeKB * 1024);
+
+        for (int i = 0; i < numPackages; i++) {
+            packNestedMsgPack(packer, nestingLevel, packageSizeKB * 1024);
+            packages.add(packer.toByteArray());
+            packer.clear();
+        }
         packer.close();
-        packages.add(packer.toByteArray());
+
         return packages;
     }
 
