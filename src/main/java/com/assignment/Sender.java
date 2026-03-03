@@ -21,8 +21,8 @@ public class Sender {
 
     static int[] package_sizes_kb = new int[] {10, 100, 1000};
     static int[] nesting_levels = new int[] {1, 5, 10};
-    static int number_of_packages = 10;
-    static int number_of_iterations = 5;
+    static int number_of_packages = 100;
+    static int number_of_iterations = 10;
 
     static int receiver_port = 8080; //TODO: change this, only a placeholder
     static String receiver_address = "localhost";
@@ -154,10 +154,14 @@ public class Sender {
             headerRow.createCell(3).setCellValue("Average Time (ns)");
 
             int rowNum = 1;
+            System.out.println("Writing time measurements to Excel file...");
+
             for (String packetType : Arrays.asList("json", "msgpack")) {
                 JSONObject packetTypeObj = timeMeasurements.getJSONObject(packetType);
-                for (String packageSize : packetTypeObj.keySet()) {
+
+                for (String packageSize : packetTypeObj.keySet().stream().sorted().toList()) {
                     JSONObject packageSizeObj = packetTypeObj.getJSONObject(packageSize);
+
                     for (String nestingLevel : packageSizeObj.keySet()) {
                         long avgTime = packageSizeObj.getLong(nestingLevel);
                         Row row = sheet.createRow(rowNum++);
