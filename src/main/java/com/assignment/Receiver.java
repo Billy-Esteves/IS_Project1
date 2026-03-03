@@ -27,11 +27,15 @@ public class Receiver {
                     try {
                         String typeOfMessage = in.readUTF();
                         int numPackages = in.readInt();
+                        byte[] data = new byte[numPackages];
 
                         for (int i = 0; i < numPackages; i++) {
                             int size = in.readInt();
-                            byte[] data = new byte[size];
+                            data = new byte[size];
                             in.readFully(data);
+                        }
+
+                        for (int j=0;j<numPackages;j++) {
 
                             if(typeOfMessage.equals("json")){
                                 String JsonMessage = new String(data, StandardCharsets.UTF_8);
