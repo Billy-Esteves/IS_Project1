@@ -21,7 +21,7 @@ public class Sender {
 
     static int[] package_sizes_kb = new int[] {10, 100, 1000};
     static int[] nesting_levels = new int[] {1, 5, 10};
-    static int number_of_packages = 1000;
+    static int number_of_packages = 1;
     static int number_of_iterations = 5;
 
     static int receiver_port = 8080; //TODO: change this, only a placeholder
