@@ -22,8 +22,8 @@ public class Sender {
 
     static int[] package_sizes_kb = new int[] {10, 100, 1000};
     static int[] nesting_levels = new int[] {1, 5, 10};
-    static int number_of_packages = 10;
-    static int number_of_iterations = 3;
+    static int number_of_packages = 50;
+    static int number_of_iterations = 30;
 
     static int receiver_port = 8080; //TODO: change this, only a placeholder
     static String receiver_address = "localhost";
@@ -98,9 +98,6 @@ public class Sender {
                             // Stop timer and calculate elapsed time
                             endTime = System.nanoTime();
                             elapsedTime = endTime - startTime;
-
-                            System.out.println("Elapsed time: " + elapsedTime + " ns");
-
 
                             if (packet_type.equals("json")) {
                                 time_measurements.getJSONObject("json").getJSONObject(String.valueOf(package_size_kb))
