@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.msgpack.core.MessagePack;
 import org.msgpack.core.MessageBufferPacker;
@@ -21,8 +22,8 @@ public class Sender {
 
     static int[] package_sizes_kb = new int[] {10, 100, 1000};
     static int[] nesting_levels = new int[] {1, 5, 10};
-    static int number_of_packages = 100;
-    static int number_of_iterations = 10;
+    static int number_of_packages = 10;
+    static int number_of_iterations = 3;
 
     static int receiver_port = 8080; //TODO: change this, only a placeholder
     static String receiver_address = "localhost";
@@ -48,8 +49,7 @@ public class Sender {
             // Create output stream to send data to receiver
             DataOutputStream out = new DataOutputStream(receiverSocket.getOutputStream());
 
-            long startTime, endTime, elapsedTime, elapsedTimeAvg;
-            long[] iteration_times = new long[number_of_iterations];
+            long startTime, endTime, elapsedTime;
             
             // Go through all combinations of package sizes and nesting levels
             for (int package_size_kb : package_sizes_kb) {
@@ -99,17 +99,20 @@ public class Sender {
                             endTime = System.nanoTime();
                             elapsedTime = endTime - startTime;
 
-                            iteration_times[iteration] = (long) elapsedTime;
-                        }
-                        
-                        // Calculate average time for this package size and nesting level combination
-                        elapsedTimeAvg = 0;
-                        for (long time : iteration_times) {
-                            elapsedTimeAvg += time;
-                        }
-                        elapsedTimeAvg /= number_of_iterations;
+                            System.out.println("Elapsed time: " + elapsedTime + " ns");
 
-                        /*
+
+                            if (packet_type.equals("json")) {
+                                time_measurements.getJSONObject("json").getJSONObject(String.valueOf(package_size_kb))
+                                .getJSONArray(String.valueOf(nesting_level)).put(elapsedTime);
+
+                            } else if (packet_type.equals("msgpack")) {
+                                time_measurements.getJSONObject("msgpack").getJSONObject(String.valueOf(package_size_kb))
+                                .getJSONArray(String.valueOf(nesting_level)).put(elapsedTime);
+                            }
+                        }
+                        /* 
+                        
                         Overall we are measuring:
                         JSON/MessagePack serialization cost
                         TCP buffering
@@ -117,15 +120,6 @@ public class Sender {
                         Receiver processing time
                         ACK round trip time
                         */
-
-                        // Store time measurement
-                        if (packet_type.equals("json")) {
-                            time_measurements.getJSONObject("json").getJSONObject(String.valueOf(package_size_kb))
-                            .put(String.valueOf(nesting_level), elapsedTimeAvg);
-                        } else if (packet_type.equals("msgpack")) {
-                            time_measurements.getJSONObject("msgpack").getJSONObject(String.valueOf(package_size_kb))
-                            .put(String.valueOf(nesting_level), elapsedTimeAvg);
-                        }
                     }
                 }
             }
@@ -151,7 +145,9 @@ public class Sender {
             headerRow.createCell(0).setCellValue("Packet Type");
             headerRow.createCell(1).setCellValue("Package Size (KB)");
             headerRow.createCell(2).setCellValue("Nesting Level");
-            headerRow.createCell(3).setCellValue("Average Time (ns)");
+            for (int i = 0; i < number_of_iterations; i++) {
+                headerRow.createCell(3 + i).setCellValue("Iteration " + (i + 1) + " Time (ns)");
+            }
 
             int rowNum = 1;
             System.out.println("Writing time measurements to Excel file...");
@@ -163,18 +159,24 @@ public class Sender {
                     JSONObject packageSizeObj = packetTypeObj.getJSONObject(packageSize);
 
                     for (String nestingLevel : packageSizeObj.keySet()) {
-                        long avgTime = packageSizeObj.getLong(nestingLevel);
                         Row row = sheet.createRow(rowNum++);
                         row.createCell(0).setCellValue(packetType);
                         row.createCell(1).setCellValue(Integer.parseInt(packageSize));
                         row.createCell(2).setCellValue(Integer.parseInt(nestingLevel));
-                        row.createCell(3).setCellValue(avgTime);
+                        for (int i = 0; i < number_of_iterations; i++) {
+
+                            JSONArray arr = packageSizeObj.getJSONArray(nestingLevel);
+
+                            long iterationTime = arr.length() > i ? arr.getLong(i) : 0;
+
+                            row.createCell(3 + i).setCellValue(iterationTime);
+                        }
                     }
                 }
             }
 
             // Auto-size columns
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 3 + number_of_iterations; i++) {
                 sheet.autoSizeColumn(i);
             }
 
@@ -204,8 +206,8 @@ public class Sender {
             JSONObject msgpackSizeObj = new JSONObject();
 
             for (int level : nesting_levels) {
-                jsonSizeObj.put(String.valueOf(level), 0);
-                msgpackSizeObj.put(String.valueOf(level), 0);
+                jsonSizeObj.put(String.valueOf(level), new org.json.JSONArray());
+                msgpackSizeObj.put(String.valueOf(level), new org.json.JSONArray());
             }
 
             jsonObj.put(String.valueOf(size), jsonSizeObj);
