@@ -22,11 +22,11 @@ public class Sender {
 
     static int[] package_sizes_kb = new int[] {10, 100, 1000};
     static int[] nesting_levels = new int[] {1, 5, 10};
-    static int number_of_packages = 50;
+    static int number_of_packages = 20;
     static int number_of_iterations = 30;
 
     static int receiver_port = 8080; //TODO: change this, only a placeholder
-    static String receiver_address = "localhost";
+    static String receiver_address = "10.59.203.246";
 
     static String[] packet_types = new String[] {"json", "msgpack"};
 
